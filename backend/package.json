@@ -1,12 +1,17 @@
 {
-  "name": "backend",
+  "name": "gemini-chatbot-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Gemini AI Chatbot Backend Microservice",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
-  "keywords": [],
+  "keywords": [
+    "gemini",
+    "ai",
+    "chatbot"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
@@ -16,5 +21,8 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
