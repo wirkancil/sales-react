@@ -1,18 +1,16 @@
+const functions = require("firebase-functions");
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const bodyParser = require("body-parser");
 
 const app = express();
-const PORT = process.env.PORT || 8080; // Cloud Run uses PORT env var
 
 // Middleware
-app.use(cors());
-app.use(bodyParser.json());
+app.use(cors({ origin: true })); // Allow all origins for Firebase Functions
+app.use(express.json());
 
 // Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(functions.config().gemini.apikey);
 
 // Helper function to fetch PDF as base64
 async function fetchPDFAsBase64(url) {
@@ -30,8 +28,13 @@ async function fetchPDFAsBase64(url) {
     }
 }
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'healthy' });
+});
+
 // Chat endpoint
-app.post("/api/chat", async (req, res) => {
+app.post("/chat", async (req, res) => {
     try {
         const { message, inventoryContext, customInstructions, brochureUrl } = req.body;
 
@@ -87,18 +90,10 @@ app.post("/api/chat", async (req, res) => {
         res.json({ response: text });
 
     } catch (error) {
-        console.error("Error in /api/chat:", error);
+        console.error("Error in /chat:", error);
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
 });
 
-// Health check endpoint for Cloud Run
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'healthy' });
-});
-
-// Bind to 0.0.0.0 for Cloud Run compatibility
-const HOST = '0.0.0.0';
-app.listen(PORT, HOST, () => {
-    console.log(`Microservice running on http://${HOST}:${PORT}`);
-});
+// Export as Firebase Function
+exports.api = functions.https.onRequest(app);
