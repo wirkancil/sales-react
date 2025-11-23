@@ -18,7 +18,10 @@ async function fetchPDFAsBase64(url) {
 }
 
 // Chat API endpoint
-exports.api = onRequest({ cors: true }, async (req, res) => {
+exports.api = onRequest({
+    cors: true,
+    invoker: "public"  // Allow unauthenticated access
+}, async (req, res) => {
     // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ error: "Method not allowed" });
