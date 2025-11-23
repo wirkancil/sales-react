@@ -1,0 +1,9 @@
+{
+  "runConfig": {
+    "runtime": "nodejs18",
+    "entrypoint": "node server.js",
+    "environmentVariables": {
+      "NODE_ENV": "production"
+    }
+  }
+}
