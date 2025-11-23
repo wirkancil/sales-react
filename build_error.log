@@ -1,0 +1,27 @@
+
+> temp_app@0.0.0 build
+> vite build
+
+vite v7.2.4 building client environment for production...
+transforming...
+✓ 1713 modules transformed.
+✗ Build failed in 1.26s
+error during build:
+src/context/AuthContext.jsx (2:9): "auth" is not exported by "src/lib/firebase.js", imported by "src/context/AuthContext.jsx".
+file: /Users/mac/Documents/AI Project/simple-landing-page/src/context/AuthContext.jsx:2:9
+
+1: import React, { createContext, useContext, useEffect, useState } from 'react';
+2: import { auth } from '../lib/firebase';
+            ^
+3: import { onAuthStateChanged, signOut } from 'firebase/auth';
+
+    at getRollupError (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+    at error (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+    at Module.error (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/node-entry.js:16956:16)
+    at Module.traceVariable (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/node-entry.js:17412:29)
+    at ModuleScope.findVariable (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/node-entry.js:15076:39)
+    at ReturnValueScope.findVariable (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/node-entry.js:5649:38)
+    at FunctionBodyScope.findVariable (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/node-entry.js:5649:38)
+    at ReturnValueScope.findVariable (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/node-entry.js:5649:38)
+    at FunctionBodyScope.findVariable (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/node-entry.js:5649:38)
+    at Identifier.bind (file:///Users/mac/Documents/AI%20Project/simple-landing-page/node_modules/rollup/dist/es/shared/node-entry.js:5423:40)
