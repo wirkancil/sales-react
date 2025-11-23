@@ -1,5 +1,9 @@
 const { onRequest } = require("firebase-functions/v2/https");
+const { defineString } = require("firebase-functions/params");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// Define environment parameter
+const geminiApiKey = defineString("GEMINI_API_KEY");
 
 // Helper function to fetch PDF as base64
 async function fetchPDFAsBase64(url) {
@@ -35,7 +39,7 @@ exports.api = onRequest({
         }
 
         // Initialize Gemini AI with API key from environment
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = geminiApiKey.value();
 
         if (!apiKey) {
             return res.status(500).json({
