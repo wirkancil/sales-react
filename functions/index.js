@@ -35,7 +35,15 @@ exports.api = onRequest({
         }
 
         // Initialize Gemini AI with API key from environment
-        const apiKey = process.env.GEMINI_API_KEY || "AIzaSyBtXXs9bJTWWi8lWlBKSC774pDx29Ptvuk";
+        const apiKey = process.env.GEMINI_API_KEY;
+
+        if (!apiKey) {
+            return res.status(500).json({
+                error: "Configuration error",
+                details: "Gemini API key not configured. Please set GEMINI_API_KEY environment variable."
+            });
+        }
+
         const genAI = new GoogleGenerativeAI(apiKey);
 
         // Use Gemini 1.5 Flash (multimodal)
@@ -55,7 +63,7 @@ exports.api = onRequest({
         - Answer questions based on the inventory and knowledge base.
         - Be polite, professional, and concise.
         - If asked about something not in the inventory, suggest they contact us directly.
-        - Respond in Indonesian (Bahasa Indonesia) or English as appropriate based on the user's language.
+        - Respond in Indonesian or English (Bahasa Indonesia or English) as appropriate based on the user's language.
         `;
 
         // Prepare content parts
