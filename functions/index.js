@@ -1,16 +1,5 @@
-const functions = require("firebase-functions");
-const express = require("express");
-const cors = require("cors");
+const { onRequest } = require("firebase-functions/v2/https");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-const app = express();
-
-// Middleware
-app.use(cors({ origin: true })); // Allow all origins for Firebase Functions
-app.use(express.json());
-
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(functions.config().gemini.apikey);
 
 // Helper function to fetch PDF as base64
 async function fetchPDFAsBase64(url) {
@@ -28,19 +17,23 @@ async function fetchPDFAsBase64(url) {
     }
 }
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'healthy' });
-});
+// Chat API endpoint
+exports.api = onRequest({ cors: true }, async (req, res) => {
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: "Method not allowed" });
+    }
 
-// Chat endpoint
-app.post("/chat", async (req, res) => {
     try {
         const { message, inventoryContext, customInstructions, brochureUrl } = req.body;
 
         if (!message) {
             return res.status(400).json({ error: "Message is required" });
         }
+
+        // Initialize Gemini AI with API key from environment
+        const apiKey = process.env.GEMINI_API_KEY || "AIzaSyBtXXs9bJTWWi8lWlBKSC774pDx29Ptvuk";
+        const genAI = new GoogleGenerativeAI(apiKey);
 
         // Use Gemini 1.5 Flash (multimodal)
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
@@ -90,10 +83,8 @@ app.post("/chat", async (req, res) => {
         res.json({ response: text });
 
     } catch (error) {
-        console.error("Error in /chat:", error);
+        console.error("Error in /api:", error);
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
 });
 
-// Export as Firebase Function
-exports.api = functions.https.onRequest(app);
