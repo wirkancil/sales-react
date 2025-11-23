@@ -92,6 +92,13 @@ app.post("/api/chat", async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Microservice running on port ${PORT}`);
+// Health check endpoint for Cloud Run
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'healthy' });
+});
+
+// Bind to 0.0.0.0 for Cloud Run compatibility
+const HOST = '0.0.0.0';
+app.listen(PORT, HOST, () => {
+    console.log(`Microservice running on http://${HOST}:${PORT}`);
 });
