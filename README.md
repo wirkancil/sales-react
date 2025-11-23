@@ -152,6 +152,78 @@ npm run build
 npm run preview
 ```
 
+## 🚀 Deployment
+
+### Firebase Hosting
+
+This project is configured for Firebase Hosting deployment.
+
+#### First Time Setup
+
+1. **Login to Firebase:**
+```bash
+npx firebase login
+```
+
+2. **Initialize Firebase (if not already done):**
+```bash
+npx firebase init hosting
+```
+Select your Firebase project (`mini-apps-289ff`) and use `dist` as the public directory.
+
+#### Deploy Frontend
+
+```bash
+npm run deploy
+```
+
+This will:
+1. Build the production bundle (`npm run build`)
+2. Deploy to Firebase Hosting (`firebase deploy --only hosting`)
+
+Your site will be available at: `https://mini-apps-289ff.web.app`
+
+#### Deploy Backend
+
+The backend microservice needs to be deployed separately. Options:
+
+**Option 1: Google Cloud Run (Recommended)**
+```bash
+cd backend
+gcloud run deploy gemini-chatbot \
+  --source . \
+  --platform managed \
+  --region asia-southeast1 \
+  --allow-unauthenticated
+```
+
+**Option 2: Railway.app**
+1. Push backend to separate Git repository
+2. Connect to Railway
+3. Add environment variables
+4. Deploy automatically
+
+**Option 3: Render.com**
+1. Create new Web Service
+2. Connect your repository
+3. Set build command: `cd backend && npm install`
+4. Set start command: `cd backend && node server.js`
+5. Add environment variables
+
+After deploying backend, update `.env`:
+```
+VITE_CHATBOT_API_URL=https://your-backend-url.com/api/chat
+```
+
+Then redeploy frontend: `npm run deploy`
+
+### Custom Domain (Optional)
+
+1. Go to Firebase Console → Hosting
+2. Click "Add custom domain"
+3. Follow DNS configuration steps
+
+
 ## 📁 Project Structure
 
 ```
