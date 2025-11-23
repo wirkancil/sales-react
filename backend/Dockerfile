@@ -16,5 +16,8 @@ COPY . .
 # Expose port (Cloud Run will set PORT env var)
 EXPOSE 8080
 
+# Set environment variable for production
+ENV NODE_ENV=production
+
 # Start the application
 CMD ["node", "server.js"]
