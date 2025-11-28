@@ -9,25 +9,28 @@ const CarFormModal = ({ isOpen, onClose, onSave, initialData }) => {
         tagline: '',
         description: '',
         price: '',
-        image: '',
+        images: [], // Array of URLs
         specs: []
     });
-    const [imageFile, setImageFile] = useState(null);
+    const [imageFiles, setImageFiles] = useState([]); // Array of new files
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         if (initialData) {
-            setFormData(initialData);
+            // Backward compatibility: if 'image' exists but 'images' doesn't, use 'image'
+            const images = initialData.images || (initialData.image ? [initialData.image] : []);
+            setFormData({ ...initialData, images });
         } else {
             setFormData({
                 name: '',
                 tagline: '',
                 description: '',
                 price: '',
-                image: '',
+                images: [],
                 specs: []
             });
         }
+        setImageFiles([]);
     }, [initialData, isOpen]);
 
     const handleChange = (e) => {
@@ -36,9 +39,21 @@ const CarFormModal = ({ isOpen, onClose, onSave, initialData }) => {
     };
 
     const handleImageChange = (e) => {
-        if (e.target.files[0]) {
-            setImageFile(e.target.files[0]);
+        if (e.target.files) {
+            const newFiles = Array.from(e.target.files);
+            setImageFiles(prev => [...prev, ...newFiles]);
         }
+    };
+
+    const handleRemoveImage = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            images: prev.images.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleRemoveFile = (index) => {
+        setImageFiles(prev => prev.filter((_, i) => i !== index));
     };
 
     const handleAddSpec = () => {
@@ -64,22 +79,34 @@ const CarFormModal = ({ isOpen, onClose, onSave, initialData }) => {
         setUploading(true);
 
         try {
-            let imageUrl = formData.image;
+            let finalImages = [...formData.images];
 
-            if (imageFile) {
-                // Fallback for demo if storage is not configured properly or fails
-                try {
-                    const storageRef = ref(storage, `cars/${Date.now()}_${imageFile.name}`);
-                    await uploadBytes(storageRef, imageFile);
-                    imageUrl = await getDownloadURL(storageRef);
-                } catch (storageError) {
-                    console.warn("Storage upload failed (expected in demo without real config), using placeholder or local URL");
-                    // Create a fake local URL for preview in this session
-                    imageUrl = URL.createObjectURL(imageFile);
-                }
+            // Upload new files
+            if (imageFiles.length > 0) {
+                const uploadPromises = imageFiles.map(async (file) => {
+                    try {
+                        const storageRef = ref(storage, `cars/${Date.now()}_${file.name}`);
+                        await uploadBytes(storageRef, file);
+                        return await getDownloadURL(storageRef);
+                    } catch (storageError) {
+                        console.warn("Storage upload failed, using placeholder", storageError);
+                        return URL.createObjectURL(file);
+                    }
+                });
+
+                const newUrls = await Promise.all(uploadPromises);
+                finalImages = [...finalImages, ...newUrls];
             }
 
-            await onSave({ ...formData, image: imageUrl });
+            // Ensure we have at least one image (optional, but good practice)
+            // if (finalImages.length === 0) { ... }
+
+            // Save with both 'images' array and 'image' string (for backward compat/thumbnail)
+            await onSave({
+                ...formData,
+                images: finalImages,
+                image: finalImages[0] || '' // Main thumbnail
+            });
             onClose();
         } catch (error) {
             console.error("Error saving car:", error);
@@ -123,14 +150,45 @@ const CarFormModal = ({ isOpen, onClose, onSave, initialData }) => {
                             <input type="text" name="price" value={formData.price} onChange={handleChange} required className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none" placeholder="e.g. Premium Pricing" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Image</label>
-                            <div className="flex items-center gap-4">
-                                {formData.image && <img src={formData.image} alt="Preview" className="w-16 h-10 object-cover rounded-md bg-gray-100" />}
-                                <label className="flex-1 cursor-pointer bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors">
-                                    <Upload className="w-4 h-4 text-gray-500" />
-                                    <span className="text-sm text-gray-600">{imageFile ? imageFile.name : 'Upload Image'}</span>
-                                    <input type="file" onChange={handleImageChange} accept="image/*" className="hidden" />
-                                </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Images</label>
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-3 gap-2">
+                                    {/* Existing Images & Previews */}
+                                    {formData.images && formData.images.map((img, index) => (
+                                        <div key={`existing-${index}`} className="relative group aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                                            <img src={img} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveImage(index)}
+                                                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+
+                                    {/* New File Previews */}
+                                    {imageFiles.map((file, index) => (
+                                        <div key={`new-${index}`} className="relative group aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                                            <img src={URL.createObjectURL(file)} alt={`New ${index}`} className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveFile(index)}
+                                                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+
+                                    {/* Upload Button */}
+                                    <label className="cursor-pointer bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center gap-1 hover:bg-gray-100 transition-colors aspect-video">
+                                        <Upload className="w-5 h-5 text-gray-400" />
+                                        <span className="text-xs text-gray-500">Add Photos</span>
+                                        <input type="file" onChange={handleImageChange} accept="image/*" multiple className="hidden" />
+                                    </label>
+                                </div>
+                                <p className="text-xs text-gray-400">First image will be the cover.</p>
                             </div>
                         </div>
                     </div>
@@ -144,10 +202,10 @@ const CarFormModal = ({ isOpen, onClose, onSave, initialData }) => {
                         </div>
                         <div className="space-y-3">
                             {formData.specs && formData.specs.map((spec, index) => (
-                                <div key={index} className="flex gap-3">
-                                    <input type="text" value={spec.label} onChange={(e) => handleSpecChange(index, 'label', e.target.value)} placeholder="Label (e.g. Range)" className="flex-1 p-2 border border-gray-200 rounded-lg text-sm" />
-                                    <input type="text" value={spec.value} onChange={(e) => handleSpecChange(index, 'value', e.target.value)} placeholder="Value (e.g. 570km)" className="flex-1 p-2 border border-gray-200 rounded-lg text-sm" />
-                                    <button type="button" onClick={() => handleRemoveSpec(index)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                                <div key={index} className="flex gap-2 items-center">
+                                    <input type="text" value={spec.label} onChange={(e) => handleSpecChange(index, 'label', e.target.value)} placeholder="Label" className="flex-1 min-w-0 p-2 border border-gray-200 rounded-lg text-sm" />
+                                    <input type="text" value={spec.value} onChange={(e) => handleSpecChange(index, 'value', e.target.value)} placeholder="Value" className="flex-1 min-w-0 p-2 border border-gray-200 rounded-lg text-sm" />
+                                    <button type="button" onClick={() => handleRemoveSpec(index)} className="shrink-0 text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-full transition-colors"><Trash2 className="w-4 h-4" /></button>
                                 </div>
                             ))}
                         </div>

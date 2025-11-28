@@ -6,9 +6,12 @@ import AdminDashboard from './pages/AdminDashboard';
 
 import ProtectedRoute from './components/ProtectedRoute';
 
+import { Toaster } from 'sonner';
+
 function App() {
   return (
     <Router>
+      <Toaster position="top-center" richColors />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />

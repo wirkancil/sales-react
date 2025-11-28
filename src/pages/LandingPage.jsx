@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
     Star, Car, Phone, Share2, ChevronRight, FileText, Download,
     MapPin, ExternalLink, Instagram, Facebook, Linkedin, Video,
     Sparkles, X, Bot, Send, MessageCircle
 } from 'lucide-react';
-import { db } from '../lib/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { toast } from 'sonner';
+import { collection, getDocs, doc, getDoc, addDoc } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
+import { db, auth } from '../lib/firebase';
 import CarCard from '../components/CarCard';
 import ProductDrawer from '../components/ProductDrawer';
 
@@ -16,7 +19,6 @@ const LandingPage = ({ previewData }) => {
     const [chatMessages, setChatMessages] = useState([]);
     const [chatInput, setChatInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const [toast, setToast] = useState({ show: false, message: '' });
     const chatEndRef = useRef(null);
 
     // Data State
@@ -41,20 +43,23 @@ const LandingPage = ({ previewData }) => {
                         setSettings({
                             profile: {
                                 name: "Generic Auto Sales",
-                                title: "Premium Vehicle Consultant",
-                                description: "Helping you find your dream car.",
-                                image: "https://ui-avatars.com/api/?name=Auto+Sales&background=0D8ABC&color=fff&size=128"
-                            },
-                            hero: {
-                                headline: "Drive the Future",
-                                subheadline: "Experience premium electric performance.",
-                                ctaText: "Book a Test Drive"
-                            },
-                            contact: {
+                                role: "Premium Vehicle Consultant",
+                                bio: "Helping you find your dream car.",
+                                image: "https://ui-avatars.com/api/?name=Auto+Sales&background=0D8ABC&color=fff&size=128",
                                 phone: "+1234567890",
-                                whatsapp: "1234567890",
-                                location: "https://maps.google.com",
-                                social: { instagram: "#", linkedin: "#" }
+                                whatsapp: "1234567890"
+                            },
+                            socials: [
+                                { type: 'instagram', url: '#', enabled: true },
+                                { type: 'linkedin', url: '#', enabled: true }
+                            ],
+                            resources: [
+                                { type: 'location', title: 'Visit Showroom', subtitle: 'Find us on Google Maps', url: 'https://maps.google.com' }
+                            ],
+                            testDrive: {
+                                title: "Book a Test Drive",
+                                subtitle: "Schedule an appointment",
+                                enabled: true
                             },
                             theme: {
                                 primaryColor: "#0D9488",
@@ -103,19 +108,14 @@ const LandingPage = ({ previewData }) => {
         }
     }, [settings]);
 
-    const showToast = (message) => {
-        setToast({ show: true, message });
-        setTimeout(() => setToast({ show: false, message: '' }), 3000);
-    };
-
     const handleCopyLink = () => {
         navigator.clipboard.writeText(window.location.href);
-        showToast("Profile Link Copied!");
+        toast.success("Profile Link Copied!");
     };
 
     const handleWhatsApp = () => {
-        if (settings?.contact?.whatsapp) {
-            window.open(`https://wa.me/${settings.contact.whatsapp}?text=Hi%20I%27m%20interested%20in%20a%20car.`, '_blank');
+        if (settings?.profile?.whatsapp) {
+            window.open(`https://wa.me/${settings.profile.whatsapp}?text=Hi%20I%27m%20interested%20in%20a%20car.`, '_blank');
         }
     };
 
@@ -143,9 +143,9 @@ const LandingPage = ({ previewData }) => {
                 },
                 body: JSON.stringify({
                     message: userMsg,
-                    inventoryContext: inventoryContext,
-                    customInstructions: settings.customInstructions,
-                    brochureUrl: settings.profile?.brochureUrl || null
+                    inventoryContext,
+                    customInstructions: settings.chatbot?.customInstructions || '', // Inject Custom Knowledge
+                    brochureUrl: settings.brochure?.url
                 })
             });
 
@@ -167,10 +167,48 @@ const LandingPage = ({ previewData }) => {
         }
     };
 
-    const handleTestDriveSubmit = (e) => {
+    const handleTestDriveSubmit = async (e) => {
         e.preventDefault();
+
+        const formData = new FormData(e.target);
+        const model = formData.get('model');
+        const name = formData.get('name');
+        const phone = formData.get('phone');
+
+        // Phone Validation
+        const phoneRegex = /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/im;
+        if (!phoneRegex.test(phone)) {
+            toast.error("Please enter a valid phone number.");
+            return;
+        }
+
+        // Log to Firestore
+        try {
+            await signInAnonymously(auth);
+            const docRef = await addDoc(collection(db, "appointments"), {
+                model,
+                name,
+                phone,
+                date: new Date().toISOString(),
+                status: 'new',
+                formName: 'Test Drive Request'
+            });
+            console.log("Appointment logged with ID: ", docRef.id);
+        } catch (error) {
+            console.error("Error logging appointment:", error);
+            // Silently fail or show generic toast if needed, but don't block user flow
+        }
+
+        if (settings?.profile?.whatsapp) {
+            const message = `Hello, I would like to book a test drive.\n\n*Model:* ${model}\n*Name:* ${name}\n*Phone:* ${phone}`;
+            const url = `https://wa.me/${settings.profile.whatsapp}?text=${encodeURIComponent(message)}`;
+            window.open(url, '_blank');
+            toast.info("Redirecting to WhatsApp...");
+        } else {
+            toast.success("Request recorded! We will contact you.");
+        }
+
         setIsTestDriveOpen(false);
-        showToast("Request Sent! We'll be in touch.");
     };
 
     if (loading || !settings) {
@@ -207,14 +245,26 @@ const LandingPage = ({ previewData }) => {
                     </div>
 
                     <h1 className="text-2xl font-bold mt-4" style={{ color: themeStyles.color }}>{settings.profile.name}</h1>
-                    <p className="text-sm font-medium uppercase tracking-wide opacity-80">{settings.profile.title}</p>
-                    <p className="text-xs opacity-60 mt-1">{settings.profile.description}</p>
+                    <p className="text-sm font-medium uppercase tracking-wide opacity-80">{settings.profile.role}</p>
+                    <p className="text-xs opacity-60 mt-1">{settings.profile.bio}</p>
 
-                    {/* Social Stats */}
-                    <div className="flex justify-center gap-4 mt-4 text-sm opacity-70">
-                        <span className="flex items-center gap-1"><Star className="w-4 h-4 text-yellow-400 fill-yellow-400" /> {settings.stats?.rating || "4.9/5"} {settings.stats?.ratingLabel || "Rating"}</span>
-                        <span className="flex items-center gap-1"><Car className="w-4 h-4" style={{ color: settings.theme.primaryColor }} /> {cars.length} {settings.stats?.inventoryLabel || "Cars Available"}</span>
-                    </div>
+                    {/* Stats: Rating & Delivered */}
+                    {(settings.profile.rating || settings.profile.deliveredCount) && (
+                        <div className="flex justify-center gap-4 mt-4 text-sm font-semibold">
+                            {settings.profile.rating && (
+                                <span className="flex items-center gap-1">
+                                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                    {settings.profile.rating}/5 Rating
+                                </span>
+                            )}
+                            {settings.profile.deliveredCount && (
+                                <span className="flex items-center gap-1">
+                                    <Car className="w-4 h-4" style={{ color: settings.theme?.primaryColor || '#0D9488' }} />
+                                    {settings.profile.deliveredCount} Delivered
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Primary Actions */}
@@ -222,32 +272,34 @@ const LandingPage = ({ previewData }) => {
                     <button onClick={handleWhatsApp} className="col-span-2 text-white py-3.5 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2 font-semibold transition-all transform hover:scale-[1.02]" style={{ backgroundColor: '#25D366' }}>
                         <MessageCircle className="w-5 h-5" /> Chat on WhatsApp
                     </button>
-                    <a href={`tel:${settings.contact.phone}`} className="py-3 px-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center gap-2 font-medium transition-colors" style={{ backgroundColor: themeStyles['--card-bg'], color: themeStyles.color }}>
-                        <Phone className="w-4 h-4" style={{ color: settings.theme.primaryColor }} /> Call Now
+                    <a href={`tel:${settings.profile.phone}`} className="py-3 px-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center gap-2 font-medium transition-colors" style={{ backgroundColor: themeStyles['--card-bg'], color: themeStyles.color }}>
+                        <Phone className="w-4 h-4" style={{ color: settings.theme?.primaryColor || '#0D9488' }} /> Call Now
                     </a>
                     <button onClick={handleCopyLink} className="py-3 px-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center gap-2 font-medium transition-colors" style={{ backgroundColor: themeStyles['--card-bg'], color: themeStyles.color }}>
-                        <Share2 className="w-4 h-4" style={{ color: settings.theme.primaryColor }} /> Share
+                        <Share2 className="w-4 h-4" style={{ color: settings.theme?.primaryColor || '#0D9488' }} /> Share
                     </button>
                 </div>
 
                 {/* Main Links List */}
                 <div className="flex flex-col gap-4 relative z-10">
-                    {/* Test Drive Highlight */}
-                    <button onClick={() => setIsTestDriveOpen(true)} className="btn-hover w-full p-1 rounded-xl group text-left relative overflow-hidden" style={{ backgroundColor: themeStyles['--card-bg'] }}>
-                        <div className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity" style={{ background: `linear-gradient(to right, ${settings.theme.primaryColor}, transparent)` }}></div>
-                        <div className="p-4 rounded-lg flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-md" style={{ backgroundColor: settings.theme.primaryColor }}>
-                                    <Car className="w-5 h-5" />
+                    {/* Test Drive Highlight (Functional CTA) */}
+                    {settings.testDrive?.enabled !== false && (
+                        <button onClick={() => setIsTestDriveOpen(true)} className="btn-hover w-full p-1 rounded-xl group text-left relative overflow-hidden" style={{ backgroundColor: themeStyles['--card-bg'] }}>
+                            <div className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity" style={{ background: `linear-gradient(to right, ${settings.theme?.primaryColor || '#0D9488'}, transparent)` }}></div>
+                            <div className="p-4 rounded-lg flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-md" style={{ backgroundColor: settings.theme?.primaryColor || '#0D9488' }}>
+                                        <Car className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold" style={{ color: themeStyles.color }}>{settings.testDrive?.title || "Book a Test Drive"}</h3>
+                                        <p className="text-xs opacity-60">{settings.testDrive?.subtitle || "Schedule an appointment"}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold" style={{ color: themeStyles.color }}>{settings.hero.ctaText}</h3>
-                                    <p className="text-xs opacity-60">{settings.hero.subheadline}</p>
-                                </div>
+                                <ChevronRight className="w-5 h-5 opacity-40 group-hover:translate-x-1 transition-transform" />
                             </div>
-                            <ChevronRight className="w-5 h-5 opacity-40 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                    </button>
+                        </button>
+                    )}
 
                     {/* Car Models */}
                     {cars.map((car) => (
@@ -255,56 +307,58 @@ const LandingPage = ({ previewData }) => {
                             key={car.id}
                             car={car}
                             onClick={() => setActiveDrawer(car)}
-                            theme={settings.theme}
+                            theme={settings.theme || {}}
                         />
                     ))}
 
                     {/* Resources Divider */}
-                    <div className="flex items-center gap-4 my-2 opacity-30">
-                        <div className="h-px bg-current flex-1"></div>
-                        <span className="text-xs font-bold uppercase">Resources</span>
-                        <div className="h-px bg-current flex-1"></div>
-                    </div>
+                    {settings.resources && settings.resources.length > 0 && (
+                        <div className="flex items-center gap-4 my-2 opacity-30">
+                            <div className="h-px bg-current flex-1"></div>
+                            <span className="text-xs font-bold uppercase">Resources</span>
+                            <div className="h-px bg-current flex-1"></div>
+                        </div>
+                    )}
 
-                    {/* Brochure */}
-                    <a
-                        href={settings.hero.brochureUrl || "#"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`btn-hover w-full p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 group ${!settings.hero.brochureUrl ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        style={{ backgroundColor: themeStyles['--card-bg'], color: themeStyles.color }}
-                        onClick={(e) => !settings.hero.brochureUrl && e.preventDefault()}
-                    >
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center transition-colors group-hover:text-white" style={{ backgroundColor: 'rgba(0,0,0,0.05)', color: 'inherit' }}>
-                            <FileText className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1 text-left">
-                            <h3 className="font-medium">Download E-Brochures</h3>
-                            <p className="text-xs opacity-60">Specs & Pricing Lists</p>
-                        </div>
-                        <Download className="w-5 h-5 opacity-30" />
-                    </a>
-
-                    {/* Location */}
-                    <a href={settings.contact.location || "https://maps.google.com"} target="_blank" className="btn-hover w-full p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 group" style={{ backgroundColor: themeStyles['--card-bg'], color: themeStyles.color }}>
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center transition-colors group-hover:text-white" style={{ backgroundColor: 'rgba(0,0,0,0.05)', color: 'inherit' }}>
-                            <MapPin className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-medium">Visit Showroom</h3>
-                            <p className="text-xs opacity-60">Find us on Google Maps</p>
-                        </div>
-                        <ExternalLink className="w-5 h-5 opacity-30" />
-                    </a>
+                    {/* Dynamic Resources */}
+                    {settings.resources && settings.resources.map((res, index) => (
+                        <a
+                            key={index}
+                            href={res.url || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-hover w-full p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 group"
+                            style={{ backgroundColor: themeStyles['--card-bg'], color: themeStyles.color }}
+                        >
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center transition-colors group-hover:text-white" style={{ backgroundColor: 'rgba(0,0,0,0.05)', color: 'inherit' }}>
+                                {res.type === 'pdf' ? <FileText className="w-5 h-5" /> :
+                                    res.type === 'location' ? <MapPin className="w-5 h-5" /> :
+                                        <ExternalLink className="w-5 h-5" />}
+                            </div>
+                            <div className="flex-1 text-left">
+                                <h3 className="font-medium">{res.title}</h3>
+                                <p className="text-xs opacity-60">{res.subtitle}</p>
+                            </div>
+                            {res.type === 'pdf' ? <Download className="w-5 h-5 opacity-30" /> : <ExternalLink className="w-5 h-5 opacity-30" />}
+                        </a>
+                    ))}
                 </div>
 
                 {/* Footer */}
                 <footer className="mt-12 text-center pb-4">
                     <div className="flex justify-center gap-6 mb-6">
-                        {settings.contact.social.instagram && <a href={settings.contact.social.instagram} className="opacity-40 hover:opacity-100 transition-opacity"><Instagram className="w-6 h-6" /></a>}
-                        {settings.contact.social.linkedin && <a href={settings.contact.social.linkedin} className="opacity-40 hover:opacity-100 transition-opacity"><Linkedin className="w-6 h-6" /></a>}
+                        {settings.socials && settings.socials.filter(s => s.enabled !== false).map((social, index) => (
+                            <a key={index} href={social.url} target="_blank" rel="noopener noreferrer" className="opacity-40 hover:opacity-100 transition-opacity" title={social.type}>
+                                {social.type === 'instagram' && <Instagram className="w-6 h-6" />}
+                                {social.type === 'facebook' && <Facebook className="w-6 h-6" />}
+                                {social.type === 'linkedin' && <Linkedin className="w-6 h-6" />}
+                                {social.type === 'website' && <ExternalLink className="w-6 h-6" />}
+                                {/* Fallback for others */}
+                                {['tiktok', 'twitter', 'youtube'].includes(social.type) && <Share2 className="w-6 h-6" />}
+                            </a>
+                        ))}
                     </div>
-                    <p className="text-xs opacity-40">© 2024 Smart Generic Auto with Gemini. All rights reserved.</p>
+                    <p className="text-xs opacity-40">© 2024 {settings.profile.name}. All rights reserved.</p>
                 </footer>
             </main>
 
@@ -329,17 +383,17 @@ const LandingPage = ({ previewData }) => {
                         <form onSubmit={handleTestDriveSubmit} className="flex flex-col gap-4">
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase ml-1">Select Model</label>
-                                <select className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-700 focus:outline-none focus:border-teal-500">
+                                <select name="model" className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-700 focus:outline-none focus:border-teal-500">
                                     {cars.map(car => <option key={car.id}>{car.name}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase ml-1">Your Name</label>
-                                <input type="text" required placeholder="John Doe" className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-teal-500" />
+                                <input name="name" type="text" required placeholder="John Doe" className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-teal-500" />
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase ml-1">Phone / WhatsApp</label>
-                                <input type="tel" required placeholder="+1 234..." className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-teal-500" />
+                                <input name="phone" type="tel" required placeholder="+1 234..." className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-teal-500" />
                             </div>
                             <button type="submit" className="mt-2 w-full text-white font-bold py-4 rounded-xl hover:opacity-90 transition-opacity" style={{ backgroundColor: settings.theme.primaryColor }}>Request Appointment</button>
                         </form>
@@ -383,8 +437,25 @@ const LandingPage = ({ previewData }) => {
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs shrink-0 ${msg.role === 'ai' ? 'text-white' : 'bg-gray-200 text-gray-600'}`} style={msg.role === 'ai' ? { backgroundColor: settings.theme.primaryColor } : {}}>
                                         {msg.role === 'ai' ? 'AI' : <span className="font-bold">U</span>}
                                     </div>
-                                    <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] text-sm ${msg.role === 'ai' ? 'bg-white border border-gray-200 text-gray-800 rounded-tl-none' : 'bg-indigo-600 text-white rounded-tr-none'}`} style={msg.role === 'user' ? { backgroundColor: settings.theme.primaryColor } : {}}>
-                                        <p>{msg.text}</p>
+                                    <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] text-sm ${msg.role === 'ai' ? 'bg-white border border-gray-200 text-gray-800 rounded-tl-none prose prose-sm max-w-none' : 'bg-indigo-600 text-white rounded-tr-none'}`} style={msg.role === 'user' ? { backgroundColor: settings.theme.primaryColor } : {}}>
+                                        {msg.role === 'ai' ? (
+                                            <ReactMarkdown
+                                                components={{
+                                                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
+                                                    li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                                                    strong: ({ node, ...props }) => <strong className="font-bold text-gray-900" {...props} />,
+                                                    h1: ({ node, ...props }) => <h1 className="text-lg font-bold mb-2" {...props} />,
+                                                    h2: ({ node, ...props }) => <h2 className="text-base font-bold mb-2" {...props} />,
+                                                    h3: ({ node, ...props }) => <h3 className="text-sm font-bold mb-1" {...props} />,
+                                                }}
+                                            >
+                                                {msg.text}
+                                            </ReactMarkdown>
+                                        ) : (
+                                            <p>{msg.text}</p>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -422,13 +493,7 @@ const LandingPage = ({ previewData }) => {
                 </div>
             )}
 
-            {/* Toast */}
-            {toast.show && (
-                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-[60] flex items-center gap-2 animate-in slide-in-from-top duration-300">
-                    <Sparkles className="w-4 h-4 text-green-400" />
-                    <span>{toast.message}</span>
-                </div>
-            )}
+
         </div>
     );
 };

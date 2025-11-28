@@ -48,26 +48,37 @@ exports.api = onRequest({
             });
         }
 
-        const genAI = new GoogleGenerativeAI(apiKey);
+        const genAI = new GoogleGenerativeAI(apiKey, { apiVersion: "v1" });
 
         // Use Gemini 1.5 Flash (multimodal)
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         // Build system prompt
         const systemPrompt = `
-        You are a helpful AI assistant for a business.
-        
+        ROLE: Professional Car Sales Consultant (Marketing Expert).
+
+        YOUR GOAL:
+        - Engage the user in a friendly, professional, and persuasive manner.
+        - Answer questions accurately using the provided INVENTORY and KNOWLEDGE BASE.
+        - ALWAYS try to convert interest into action (Test Drive or WhatsApp contact).
+        - Be flexible and interactive. Don't just dump facts; ask follow-up questions to understand their needs.
+
         YOUR KNOWLEDGE BASE:
         ${customInstructions || "No specific instructions provided."}
 
         CURRENT INVENTORY:
         ${inventoryContext || "No inventory data available."}
 
-        INSTRUCTIONS:
-        - Answer questions based on the inventory and knowledge base.
-        - Be polite, professional, and concise.
-        - If asked about something not in the inventory, suggest they contact us directly.
-        - Respond in Indonesian or English (Bahasa Indonesia or English) as appropriate based on the user's language.
+        GUIDELINES:
+        1. **Tone**: Enthusiastic, polite, and professional. Use emojis sparingly but effectively to sound modern.
+        2. **Structure**: 
+           - Acknowledge the user's interest.
+           - Provide the answer/specs clearly (use bullet points or bold text for readability).
+           - **Crucial**: End every response with a question or a Call to Action (CTA).
+             - Example: "Would you like to schedule a test drive to feel the acceleration yourself?"
+             - Example: "Shall I send you the full brochure via WhatsApp?"
+        3. **Language**: Respond in the same language as the user (Indonesian or English).
+        4. **Unknowns**: If information is missing, apologize gracefully and suggest contacting us directly via WhatsApp for the latest details.
         `;
 
         // Prepare content parts
@@ -102,4 +113,3 @@ exports.api = onRequest({
         res.status(500).json({ error: "Internal server error", details: error.message });
     }
 });
-

@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Headphones } from 'lucide-react';
 
 const ProductDrawer = ({ car, onClose, onInterested, theme }) => {
+    const [activeImage, setActiveImage] = useState(null);
+
+    // Reset active image when car changes
+    React.useEffect(() => {
+        if (car) {
+            setActiveImage(car.images?.[0] || car.image);
+        }
+    }, [car]);
+
     if (!car) return null;
 
     return (
@@ -14,12 +23,33 @@ const ProductDrawer = ({ car, onClose, onInterested, theme }) => {
                     </div>
 
                     {/* Drawer Content */}
-                    <div className="relative h-48 w-full">
-                        <img src={car.image} className="w-full h-full object-cover" alt={car.name} />
-                        <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent"></div>
-                        <button className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-2 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 hover:bg-white transition-colors" style={{ color: theme?.primaryColor || '#0D9488' }}>
-                            <Headphones className="w-4 h-4" /> <span>Listen to Tour</span>
-                        </button>
+                    <div className="relative w-full bg-gray-100">
+                        <div className="aspect-video w-full relative overflow-hidden">
+                            <img
+                                src={activeImage || car.images?.[0] || car.image}
+                                className="w-full h-full object-cover transition-opacity duration-300"
+                                alt={car.name}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
+                            <button className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-2 rounded-full text-xs font-bold shadow-lg flex items-center gap-2 hover:bg-white transition-colors" style={{ color: theme?.primaryColor || '#0D9488' }}>
+                                <Headphones className="w-4 h-4" /> <span>Listen to Tour</span>
+                            </button>
+                        </div>
+
+                        {/* Thumbnails */}
+                        {(car.images?.length > 1) && (
+                            <div className="flex gap-2 p-2 overflow-x-auto custom-scrollbar">
+                                {car.images.map((img, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => setActiveImage(img)}
+                                        className={`flex-shrink-0 w-16 h-12 rounded-md overflow-hidden border-2 transition-all ${activeImage === img ? 'border-teal-500 ring-2 ring-teal-500/30' : 'border-transparent opacity-70 hover:opacity-100'}`}
+                                    >
+                                        <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="px-5 pt-2 pb-6">

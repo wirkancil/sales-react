@@ -3,13 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../lib/firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Plus, Trash2, LogOut, Database, Edit2, Settings, Layout, Eye, Save, Upload, MapPin, MessageSquare, LayoutDashboard, Calendar, RotateCcw, Link as LinkIcon, FileText, User, ChevronDown, Package } from 'lucide-react';
+import { Plus, Trash2, LogOut, Database, Edit2, Settings, Layout, Eye, Save, Upload, MapPin, MessageSquare, LayoutDashboard, Calendar, RotateCcw, Link as LinkIcon, FileText, User, ChevronDown, Package, Briefcase, Sparkles, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import CarFormModal from '../components/CarFormModal';
 import ResourceFormModal from '../components/ResourceFormModal';
 import SettingsModal from '../components/SettingsModal';
-import LandingPage from './LandingPage';
 
 const themeTemplates = {
   modernTeal: {
@@ -56,14 +54,12 @@ const themeTemplates = {
   }
 };
 
-const AdminDashboard = () => {
+const ContentCreatorDashboard = () => {
   const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
-  const [cars, setCars] = useState([]);
+  // Removed cars state
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCar, setEditingCar] = useState(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  // Removed car modal state
   const [uploading, setUploading] = useState(false);
 
   // Resource Modal State
@@ -77,36 +73,41 @@ const AdminDashboard = () => {
   // Settings State
   const [settings, setSettings] = useState({
     profile: {
-      name: "Alex Tan",
-      role: "Senior Sales Consultant",
-      bio: "Helping you build dreams...",
-      image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=256&q=80",
+      name: "Alex Creator",
+      role: "Lifestyle & Tech Creator",
+      bio: "Helping brands tell better stories...",
+      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop",
       phone: "+123456789",
       whatsapp: "123456789",
-      rating: "4.9",
-      deliveredCount: "500+"
+      verified: true,
+      onlineStatus: true
     },
     socials: [
       { type: 'instagram', url: '#', enabled: true },
-      { type: 'facebook', url: '#', enabled: true },
       { type: 'tiktok', url: '#', enabled: true },
-      { type: 'linkedin', url: '#', enabled: true }
+      { type: 'youtube', url: '#', enabled: true }
     ],
     resources: [
-      { type: 'pdf', title: 'Download E-Brochures', subtitle: 'Specs & Pricing Lists', url: '#' },
-      { type: 'location', title: 'Visit Showroom', subtitle: '300 BYD Avenue, Tech City', url: 'https://maps.google.com' }
+      { type: 'link', title: 'Business Inquiries', subtitle: 'Direct WhatsApp chat', url: '#' }
     ],
-    testDrive: {
-      title: "Book a Test Drive",
-      subtitle: "Schedule an appointment",
+    rateCard: {
+      title: "Download Rate Card 2025",
+      subtitle: "Updated Jan 2025 • PDF",
+      fileUrl: "",
       enabled: true
     },
-    chatbot: {
+    portfolio: {
+      showreel: "",
+      topContent: [],
+      gallery: [],
+      assets: []
+    },
+    aiPitch: {
       enabled: true,
-      customInstructions: ""
+      customPrompt: ""
     },
     theme: {
-      preset: "modernTeal",
+      preset: "modernTeal", // Reuse existing theme logic for now
       custom: false,
       primaryColor: "#0D9488",
       backgroundColor: "#F9FAFB",
